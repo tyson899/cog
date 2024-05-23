@@ -315,6 +315,7 @@ _concatenate_iterator_schema = {
 if PYDANTIC_V2:
     ConcatenateIterator = Annotated[
         Iterator[Item],
+        pydantic.PlainValidator(list),
         pydantic.WithJsonSchema(_concatenate_iterator_schema),
     ]
 
@@ -339,6 +340,7 @@ else:
 if PYDANTIC_V2:
     AsyncConcatenateIterator = Annotated[
         AsyncIterator[Item],
+        pydantic.PlainValidator(list),
         pydantic.WithJsonSchema(_concatenate_iterator_schema),
     ]
 
