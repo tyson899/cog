@@ -19,9 +19,12 @@ class PredictionInput:
         assert request.id, "PredictionRequest must have an id"
         if PYDANTIC_V2:
             payload = request.model_dump()["input"]
+            print("PAYLOAD", payload)
         else:
             payload = request.dict()["input"]
-        return cls(payload=payload, id=request.id)
+        instance = cls(payload=payload, id=request.id)
+        print("INSTANCE", instance)
+        return instance
 
 
 @define

@@ -86,11 +86,103 @@ def validate_file_value(value: Any) -> io.IOBase:
 
 
 if PYDANTIC_V2:
-    File = Annotated[
-        io.IOBase,
-        pydantic.PlainValidator(validate_file_value),
-        pydantic.WithJsonSchema({"type": "string", "format": "uri"}),
-    ]
+    import base64
+    import io
+    import mimetypes
+    import os
+    from typing import Any
+
+    import requests
+    from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
+    from pydantic.json_schema import JsonSchemaValue
+    from pydantic_core import CoreSchema, core_schema
+
+    class File(pydantic.BaseModel):
+        def __init__(self, value: Union[str, bytes, io.IOBase]):
+            if isinstance(value, str):
+                parsed_url = urllib.parse.urlparse(value)
+                if parsed_url.scheme == "data":
+                    self.file_content = base64.b64decode(parsed_url.netloc).decode(
+                        "utf-8"
+                    )
+                    self.file_name = None
+                    self.mime_type = parsed_url.path.split(";")[0]
+                elif parsed_url.scheme == "http" or parsed_url.scheme == "https":
+                    print("DOWNLOADING", value)
+                    resp = urllib.request.urlopen(value)  # noqa: S310
+                    self.file_content = resp.read()
+                    self.file_name = get_filename_from_urlopen(resp)
+                    self.mime_type = resp.headers.get_content_type()
+                else:
+                    raise ValueError(f"'{parsed_url.scheme}' is not supported.")
+            elif isinstance(value, io.StringIO):
+                self.file_content = value.getvalue().encode("utf-8")
+                self.file_name = None
+                self.mime_type = "application/octet-stream"
+            else:
+                self.file_content = value
+                self.file_name = None
+                self.mime_type = mimetypes.guess_type(value)[0]
+
+        def read(self) -> bytes:
+            print("READING", self.file_content)
+            return self.file_content
+
+        def __repr__(self) -> str:
+            if self.file_name:
+                return f"<File file_name={self.file_name} mime_type={self.mime_type}>"
+            else:
+                return f"<File file_content={self.file_content[:30]}... mime_type={self.mime_type}>"
+
+        @classmethod
+        def __get_pydantic_core_schema__(
+            cls, source_type: Any, handler: GetCoreSchemaHandler
+        ) -> CoreSchema:
+            def from_path_or_content(value: Any) -> "File":
+                print("from_path_or_content", value)
+                instance = cls(value)
+                print("CLASS", cls)
+                print("INSTANCE", instance)
+                return instance
+
+            url_schema = core_schema.chain_schema(
+                [
+                    core_schema.str_schema(),  # Ensure the input is a string
+                    core_schema.no_info_plain_validator_function(
+                        from_path_or_content
+                    ),  # Convert string to File
+                ]
+            )
+
+            def to_data_uri(instance: "File") -> str:
+                return f"data:{instance.mime_type};base64,{base64.b64encode(instance.file_content).decode('utf-8')}"
+
+            # serialization_schema = core_schema.plain_serializer_function_ser_schema(
+            #     to_data_uri,
+            #     return_schema=core_schema.is_instance_schema(cls),
+            # )
+
+            # serialization_schema = core_schema.model_ser_schema(
+            #     cls,
+            #     schema=core_schema.is_instance_schema(cls),
+            #     serializer=to_data_uri,
+            # )
+
+            serialization_scheme = core_schema.simple_ser_schema(cls)
+
+            return core_schema.json_or_python_schema(
+                json_schema=url_schema,
+                python_schema=url_schema,
+                serialization=serialization_scheme,
+            )
+
+        @classmethod
+        def __get_pydantic_json_schema__(
+            cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+        ) -> JsonSchemaValue:
+            json_schema = handler(core_schema)
+            json_schema["format"] = "uri"
+            return json_schema
 
 else:
 

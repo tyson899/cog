@@ -114,6 +114,7 @@ def test_output_path_to_http(client, match):
 @uses_predictor("output_complex")
 def test_complex_output(client, match):
     resp = client.post("/predictions")
+    print(resp.json())
     assert resp.json() == match(
         {
             "output": {
