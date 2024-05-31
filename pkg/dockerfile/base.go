@@ -121,20 +121,28 @@ func BaseImageConfigurations() []AvailableBaseImageConfigurations {
 				{
 					Version: "3.11",
 					PyTorch: []PyTorchVersion{
-						{Version: "2.0.0"},
-						{Version: "2.0.1"},
+						{Version: "2.3"},
+						{Version: "2.3.0"},
+						{Version: "2.2"},
+						{Version: "2.2.2"},
+						{Version: "2.2.0"},
 						{Version: "2.1.0"},
 						{Version: "2.1.1"},
-						{Version: "2.2.0"},
+						{Version: "2.0.1"},
+						{Version: "2.0.0"},
 					},
 					CUDA: []CUDAVersion{
-						{Version: "11.6.2"},
+						{Version: "11.6"},
 						{Version: "11.8"},
 					},
 				},
 				{
 					Version: "3.10",
 					PyTorch: []PyTorchVersion{
+						{Version: "2.3"},
+						{Version: "2.3.0"},
+						{Version: "2.2"},
+						{Version: "2.2.2"},
 						{Version: "1.12.1"},
 					},
 					CUDA: []CUDAVersion{
@@ -156,6 +164,10 @@ func BaseImageConfigurations() []AvailableBaseImageConfigurations {
 						{Version: "1.13.0"},
 						{Version: "2.0.0"},
 						{Version: "2.0.1"},
+						{Version: "2.3"},
+						{Version: "2.3.0"},
+						{Version: "2.2"},
+						{Version: "2.2.2"},
 					},
 					CUDA: []CUDAVersion{
 						{Version: "11.2"},
