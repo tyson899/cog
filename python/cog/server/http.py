@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import functools
 import logging
+import multiprocessing
 import os
 import signal
 import socket
@@ -482,6 +483,7 @@ def _cpu_count() -> int:
 
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method('spawn', force=True)
     parser = argparse.ArgumentParser(description="Cog HTTP server")
     parser.add_argument(
         "--threads",
