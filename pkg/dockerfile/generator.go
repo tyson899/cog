@@ -40,6 +40,15 @@ coverage.xml
 .hypothesis
 `
 
+type BaseImage int
+
+const (
+	BASE_IMAGE_CUDA_DEVEL BaseImage = iota
+	BASE_IMAGE_CUDA_RUNTIME
+	BASE_IMAGE_CUDA_BASE
+	BASE_IMAGE_PYTHON
+)
+
 type Generator struct {
 	Config *config.Config
 	Dir    string
@@ -48,7 +57,7 @@ type Generator struct {
 	GOOS   string
 	GOARCH string
 
-	useCudaBaseImage bool
+	useCudaBaseImage BaseImage
 
 	// absolute path to tmpDir, a directory that will be cleaned up
 	tmpDir string
@@ -85,13 +94,30 @@ func NewGenerator(config *config.Config, dir string) (*Generator, error) {
 		tmpDir:           tmpDir,
 		relativeTmpDir:   relativeTmpDir,
 		fileWalker:       filepath.Walk,
-		useCudaBaseImage: true,
+		useCudaBaseImage: BASE_IMAGE_CUDA_DEVEL,
 	}, nil
 }
 
 func (g *Generator) SetUseCudaBaseImage(argumentValue string) {
-	// "false" -> false, "true" -> true, "auto" -> true, "asdf" -> true
-	g.useCudaBaseImage = argumentValue != "false"
+	// options include "devel", "runtime", "base", "none"
+	// print warning if not one of these and default to devel
+
+	switch argumentValue {
+	case "none", "false": // false is for backwards compatibility
+		fmt.Println("Warning: using 'none' for --use-cuda-base-image may cause problems for non-torch projects.")
+		g.useCudaBaseImage = BASE_IMAGE_PYTHON
+	case "runtime", "base":
+		fmt.Println("Warning: using the CUDA " + argumentValue + " base image is highly experimental.")
+		g.useCudaBaseImage = BASE_IMAGE_CUDA_RUNTIME
+		if argumentValue == "base" {
+			g.useCudaBaseImage = BASE_IMAGE_CUDA_BASE
+		}
+	case "devel":
+		g.useCudaBaseImage = BASE_IMAGE_CUDA_DEVEL
+	default:
+		fmt.Println("Warning: invalid value for --use-cuda-base-image. Defaulting to 'devel'.")
+		g.useCudaBaseImage = BASE_IMAGE_CUDA_DEVEL
+	}
 }
 
 func (g *Generator) GenerateBase() (string, error) {
@@ -104,7 +130,7 @@ func (g *Generator) GenerateBase() (string, error) {
 		return "", err
 	}
 	installPython := ""
-	if g.Config.Build.GPU && g.useCudaBaseImage {
+	if g.Config.Build.GPU && g.useCudaBaseImage != BASE_IMAGE_PYTHON {
 		installPython, err = g.installPythonCUDA()
 		if err != nil {
 			return "", err
@@ -167,7 +193,7 @@ func (g *Generator) Generate(imageName string) (weightsBase string, dockerfile s
 		return "", "", "", err
 	}
 	installPython := ""
-	if g.Config.Build.GPU && g.useCudaBaseImage {
+	if g.Config.Build.GPU && g.useCudaBaseImage != BASE_IMAGE_PYTHON {
 		installPython, err = g.installPythonCUDA()
 		if err != nil {
 			return "", "", "", err
@@ -245,8 +271,21 @@ func (g *Generator) Cleanup() error {
 }
 
 func (g *Generator) baseImage() (string, error) {
-	if g.Config.Build.GPU && g.useCudaBaseImage {
-		return g.Config.CUDABaseImageTag()
+	if g.Config.Build.GPU && g.useCudaBaseImage != BASE_IMAGE_PYTHON {
+		develImage, err := g.Config.CUDABaseImageTag()
+		if err != nil {
+			return "", err
+		}
+		switch g.useCudaBaseImage {
+		case BASE_IMAGE_CUDA_DEVEL:
+			return develImage, nil
+		case BASE_IMAGE_CUDA_RUNTIME:
+			return strings.Replace(develImage, "devel", "runtime", 1), nil
+		case BASE_IMAGE_CUDA_BASE:
+			return strings.Replace(develImage, "devel", "base", 1), nil
+		default:
+			return "", fmt.Errorf("Invalid base image type")
+		}
 	}
 	return "python:" + g.Config.Build.PythonVersion + "-slim", nil
 }
@@ -377,7 +416,7 @@ func (g *Generator) pipInstalls() string {
 	// return "COPY --from=deps --link /dep COPY --from=deps /src"
 	// ...except it's actually /root/.pyenv/versions/3.8.17/lib/python3.8/site-packages
 	py := g.Config.Build.PythonVersion
-	if g.Config.Build.GPU && g.useCudaBaseImage {
+	if g.Config.Build.GPU && g.useCudaBaseImage != BASE_IMAGE_PYTHON {
 		// this requires buildkit!
 		// we should check for buildkit and otherwise revert to symlinks or copying into /src
 		// we mount to avoid copying, which avoids having two copies in this layer
