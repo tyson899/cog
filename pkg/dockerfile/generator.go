@@ -167,9 +167,15 @@ func (g *Generator) GenerateDockerfileWithoutSeparateWeights() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	postInstall, err := g.postInstallCommands()
+	if err != nil {
+		return "", err
+	}
+
 	return strings.Join(filterEmpty([]string{
 		base,
 		`COPY . /src`,
+		postInstall,
 	}), "\n"), nil
 }
 
@@ -207,6 +213,10 @@ func (g *Generator) Generate(imageName string) (weightsBase string, dockerfile s
 	if err != nil {
 		return "", "", "", err
 	}
+	postInstallCommands, err := g.postInstallCommands()
+	if err != nil {
+		return "", "", "", err
+	}
 
 	base := []string{
 		"#syntax=docker/dockerfile:1.4",
@@ -230,6 +240,7 @@ func (g *Generator) Generate(imageName string) (weightsBase string, dockerfile s
 		`EXPOSE 5000`,
 		`CMD ["python", "-m", "cog.server.http"]`,
 		`COPY . /src`,
+		postInstallCommands,
 	)
 
 	dockerignoreContents = makeDockerignoreForWeights(g.modelDirs, g.modelFiles)
@@ -425,14 +436,7 @@ func (g *Generator) pipInstalls() string {
 	return "COPY --from=deps --link /dep /usr/local/lib/python" + py + "/site-packages"
 }
 
-func (g *Generator) runCommands() (string, error) {
-	runCommands := g.Config.Build.Run
-
-	// For backwards compatibility
-	for _, command := range g.Config.Build.PreInstall {
-		runCommands = append(runCommands, config.RunItem{Command: command})
-	}
-
+func transpileRunCommands(runCommands []config.RunItem) (string, error) {
 	lines := []string{}
 	for _, run := range runCommands {
 		command := strings.TrimSpace(run.Command)
@@ -456,6 +460,21 @@ This is the offending line: %s`, command)
 		}
 	}
 	return strings.Join(lines, "\n"), nil
+}
+
+func (g *Generator) runCommands() (string, error) {
+	runCommands := g.Config.Build.Run
+
+	// For backwards compatibility
+	for _, command := range g.Config.Build.PreInstall {
+		runCommands = append(runCommands, config.RunItem{Command: command})
+	}
+
+	return transpileRunCommands(runCommands)
+}
+
+func (g *Generator) postInstallCommands() (string, error) {
+	return transpileRunCommands(g.Config.Build.PostInstall)
 }
 
 // writeTemp writes a temporary file that can be used as part of the build process

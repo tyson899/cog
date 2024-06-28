@@ -40,6 +40,7 @@ type Build struct {
 	PreInstall         []string  `json:"pre_install,omitempty" yaml:"pre_install"` // Deprecated, but included for backwards compatibility
 	CUDA               string    `json:"cuda,omitempty" yaml:"cuda"`
 	CuDNN              string    `json:"cudnn,omitempty" yaml:"cudnn"`
+	PostInstall        []RunItem `json:"post_install,omitempty" yaml:"post_install"`
 
 	pythonRequirementsContent []string
 }
