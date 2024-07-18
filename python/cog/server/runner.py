@@ -37,7 +37,6 @@ from .exceptions import (
     InvalidStateException,
 )
 from .probes import ProbeHelper
-from .webhook import SKIP_START_EVENT
 from .worker import Mux, _ChildWorker
 
 log = structlog.get_logger("cog.server.runner")

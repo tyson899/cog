@@ -33,8 +33,6 @@ from fastapi.responses import JSONResponse
 from pydantic.error_wrappers import ErrorWrapper
 
 from .. import schema
-from ..errors import PredictorNotSet
-from ..json import upload_files
 from ..logging import setup_logging
 from ..predictor import (
     get_input_type,
@@ -43,7 +41,7 @@ from ..predictor import (
     get_training_input_type,
     get_training_output_type,
     load_config,
-    load_slim_predictor_from_ref,
+    load_predictor_from_ref,
 )
 from ..types import CogConfig
 from .runner import (
@@ -126,7 +124,8 @@ def create_app(
 
     try:
         predictor_ref = get_predictor_ref(config, mode)
-        predictor = load_slim_predictor_from_ref(predictor_ref, "predict")
+        # TODO: avoid loading predictor code in this process
+        predictor = load_predictor_from_ref(predictor_ref)
         InputType = get_input_type(predictor)
         OutputType = get_output_type(predictor)
     except Exception:
@@ -166,19 +165,24 @@ def create_app(
 
     if "train" in config:
         try:
-            trainer_ref = get_predictor_ref(config, "train")
-            trainer = load_slim_predictor_from_ref(trainer_ref, "train")
+            # TODO: avoid loading trainer code in this process
+            trainer = load_predictor_from_ref(config["train"])
             TrainingInputType = get_training_input_type(trainer)
             TrainingOutputType = get_training_output_type(trainer)
+        except Exception:
+            app.state.health = Health.SETUP_FAILED
+            msg = "Error while loading trainer:\n\n" + traceback.format_exc()
+            add_setup_failed_routes(app, started_at, msg)
+            return app
 
-            class TrainingRequest(
-                schema.TrainingRequest.with_types(input_type=TrainingInputType)
-            ):
-                pass
+        class TrainingRequest(
+            schema.TrainingRequest.with_types(input_type=TrainingInputType)
+        ):
+            pass
 
-            TrainingResponse = schema.TrainingResponse.with_types(
-                input_type=TrainingInputType, output_type=TrainingOutputType
-            )
+        TrainingResponse = schema.TrainingResponse.with_types(
+            input_type=TrainingInputType, output_type=TrainingOutputType
+        )
 
         @app.post(
             "/trainings",
@@ -218,20 +222,9 @@ def create_app(
                 tracestate=tracestate,
             )
 
-            @app.post("/trainings/{training_id}/cancel")
-            def cancel_training(
-                training_id: str = Path(..., title="Training ID"),
-            ) -> Any:
-                return cancel(training_id)
-
-        except Exception as e:
-            if isinstance(e, (PredictorNotSet, FileNotFoundError)) and not is_build:
-                pass  # ignore missing train.py for backward compatibility with existing "bad" models in use
-            else:
-                app.state.health = Health.SETUP_FAILED
-                msg = "Error while loading trainer:\n\n" + traceback.format_exc()
-                add_setup_failed_routes(app, started_at, msg)
-                return app
+        @app.post("/trainings/{training_id}/cancel")
+        def cancel_training(training_id: str = Path(..., title="Training ID")) -> Any:
+            return cancel(training_id)
 
     @app.on_event("startup")
     def startup() -> None:
