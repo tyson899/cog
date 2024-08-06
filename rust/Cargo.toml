@@ -1,0 +1,35 @@
+[package]
+name = "cog"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.28", features = ["full"] }
+tokio-stream = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+async-trait = "0.1"
+pyo3 = { version = "0.21", features = ["auto-initialize"] }
+pyo3-asyncio-0-21 = { version = "0.21", features = [
+    "tokio-runtime",
+    "attributes",
+] }
+pythonize = "0.21"
+
+axum = "0.7"
+tower = { version = "0.4", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+futures = "0.3"
+tokio-metrics = { version = "0.3.1", default-features = false }
+serde_json = "1.0"
+maplit = "1.0"
+clap = { version = "4.5.13", features = ["derive"] }
+tower-service = "0.3.2"
+tokio-util = "0.7.11"
+tokio-tower = "0.6.0"
+
+[lib]
+name = "cog"
+path = "src/lib.rs"
