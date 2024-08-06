@@ -232,7 +232,16 @@ Below, we define a meta-schema for Cog models and provide examples of its use:
             "type": "object",
             "properties": {
                 "input": { "type": "object" },
-                "output": { "type": "object" }
+                "output": {
+                    "oneOf": [
+                        { "type": "object" },
+                        { "type": "array" },
+                        { "type": "string" },
+                        { "type": "number" },
+                        { "type": "boolean" },
+                        { "type": "null" }
+                    ]
+                }
             },
             "required": [ "input", "output" ]
         },
