@@ -2,6 +2,18 @@
 
 (Early exploration of using Rust to serve Cog models)
 
+**Next Steps**
+
+- [ ] Add support for cancellation
+- [ ] Add support for `prefer-async` and polling instead of blocking
+  - [ ] Use [multiplexing](https://docs.rs/tokio-tower/latest/tokio_tower/multiplex/index.html) client for async requests?
+- [ ] Implement health check endpoint
+- [ ] Implement webhook client
+- [ ] Add consumer for logs and progressive outputs
+- [ ] Implement file uploader client
+- [ ] Hook up Python FFI with pyo3
+- [ ] Comprehensive unit, integration, and fuzz testing
+
 ## Overview
 
 - `Server` handles HTTP requests as documented in [HTTP](/docs/http.md)
