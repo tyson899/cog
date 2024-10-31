@@ -518,6 +518,15 @@ def make_worker(predictor_ref: str, tee_output: bool = True) -> Worker:
     return parent
 
 
+def start_supervised_child(
+    python: str, predictor_ref: str, tee_output: bool = True
+) -> subprocess.Popen:
+    return subprocess.Popen(
+        [python, "-m", "cog.websockets_server"],
+        env={"COG_PREDICTOR_REF": predictor_ref},
+    )
+
+
 def _prepare_payload(payload: Dict[str, Any]) -> None:
     for k, v in payload.items():
         # Check if v is an instance of URLPath

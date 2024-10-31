@@ -21,14 +21,15 @@ requires-python = ">=3.8"
 
 dependencies = [
   # intentionally loose. perhaps these should be vendored to not collide with user code?
-  "attrs>=20.1,<24",
-  "fastapi>=0.75.2,<0.111.0",
+  "attrs>=20.1,<24", # server only
+  "fastapi>=0.75.2,<0.111.0",  # server only
   "pydantic>=1.9,<3",
   "PyYAML",
   "requests>=2,<3",
   "structlog>=20,<25",
   "typing_extensions>=4.4.0",
-  "uvicorn[standard]>=0.12,<1",
+  "uvicorn[standard]>=0.12,<1", # mostly server only
+  "websockets",
 ]
 
 dynamic = ["version"]
