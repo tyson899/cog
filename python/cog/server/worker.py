@@ -55,6 +55,12 @@ class WorkerState(Enum):
     DEFUNCT = auto()
 
 
+@unique
+class WorkerFlavor(Enum):
+    MULTIPROCESSING = auto()
+    WEBSOCKET = auto()
+
+
 class Worker:
     def __init__(self, child: "_ChildWorker", events: Connection) -> None:
         self._child = child
@@ -251,6 +257,59 @@ class Worker:
                 subscriber(ev)
             except Exception:
                 log.warn("publish failed", subscriber=subscriber, ev=ev, exc_info=True)
+
+
+class WebSocketWorker:
+    def __init__(
+        self,
+        predictor_ref: str,
+        *,
+        python_executable: str = sys.executable,
+        host: str = "127.0.0.1",
+        port: int = 8389,
+    ) -> None:
+        self.predictor_ref = predictor_ref
+        self._child = subprocess.Popen(
+            [
+                python_executable,
+                "-m",
+                "uvicorn",
+                "--host",
+                host,
+                "--port",
+                str(port),
+                "cog.websockets_server:app",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self._uri = f"ws://{host}:{port}"
+        self._state = WorkerState.NEW
+        self._result: Optional["Future[Done]"] = None
+        self._subscribers: dict[int, Callable[[_PublicEventType], None]] = {}
+
+    async def setup(self):
+        with connect(self._uri) as websocket:
+            await websocket.send(json.dumps({"type": "setup"}), text=True)
+
+            async for message in websocket:
+                # validate message, checking for "type": "error"
+                # forward message to subscribers
+                ...
+
+    async def predict(self, payload: Dict[str, Any]):
+        with connect(self._uri) as websocket:
+            await websocket.send(json.dumps({"type": "prediction", "payload": payload}))
+
+            async for message in websocket:
+                # validate message, checking for "type": "error"
+                # forward message to subscribers
+                ...
+
+    def subscribe(self, subscriber: Callable[[_PublicEventType], None]) -> int:
+        sid = uuid.uuid4().int
+        self._subscribers[sid] = subscriber
+        return sid
 
 
 class LockedConn:
@@ -511,20 +570,20 @@ class _ChildWorker(_spawn.Process):  # type: ignore
             self._events.send(Log(data, source="stderr"))
 
 
-def make_worker(predictor_ref: str, tee_output: bool = True) -> Worker:
-    parent_conn, child_conn = _spawn.Pipe()
-    child = _ChildWorker(predictor_ref, events=child_conn, tee_output=tee_output)
-    parent = Worker(child=child, events=parent_conn)
-    return parent
+def make_worker(
+    predictor_ref: str,
+    *,
+    flavor: WorkerFlavor = WorkerFlavor.MULTIPROCESSING,
+    tee_output: bool = True,
+) -> Worker:
+    if flavor == WorkerFlavor.MULTIPROCESSING:
+        parent_conn, child_conn = _spawn.Pipe()
+        child = _ChildWorker(predictor_ref, events=child_conn, tee_output=tee_output)
+        parent = Worker(child=child, events=parent_conn)
+        return parent
 
-
-def start_supervised_child(
-    python: str, predictor_ref: str, tee_output: bool = True
-) -> subprocess.Popen:
-    return subprocess.Popen(
-        [python, "-m", "cog.websockets_server"],
-        env={"COG_PREDICTOR_REF": predictor_ref},
-    )
+    if flavor == WorkerFlavor.WEBSOCKET:
+        return WebSocketWorker(predictor_ref)
 
 
 def _prepare_payload(payload: Dict[str, Any]) -> None:

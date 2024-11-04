@@ -1,65 +1,56 @@
 #!/usr/bin/env python
-import asyncio
-import inspect
-import json
 import logging
 import os
-import signal
 
-from websockets.asyncio.server import serve
+from starlette.websockets import WebSocket
 
 from .predictor import get_predict, load_predictor_from_ref, run_setup
 from .logging import setup_logging
 
 
-def build_run(predictor_ref: str):
+def build_app(predictor_ref: str):
     predictor = load_predictor_from_ref(predictor_ref)
     if predictor is None:
         msg = "predictor is None"
         raise ValueError(msg)
 
-    if hasattr(predictor, "setup"):
-        run_setup(predictor)
+    async def app(scope, receive, send):
+        predict = None
 
-    predict = get_predict(predictor)
+        websocket = WebSocket(scope=scope, receive=receive, send=send)
+        await websocket.accept()
+        async for message in websocket.iter_json():
+            if message["type"] == "setup":
+                if hasattr(predictor, "setup"):
+                    run_setup(predictor)
 
-    async def run(websocket):
-        async for message in websocket:
-            event = json.loads(message)
-            if event["type"] == "prediction":
-                await websocket.send(
-                    json.dumps(
-                        predict(**event["payload"])
-                    )
-                )
-            else:
-                await websocket.send(
-                    json.dumps(
+                predict = get_predict(predictor)
+
+                await websocket.send_json({"type": "setup.complete"})
+
+            elif message["type"] == "prediction":
+                if predict is None:
+                    await websocket.send_json(
                         {
                             "type": "error",
-                            "message": f"unknown event type {event['type']}",
+                            "message": "setup must be performed before predictions",
                         }
                     )
+                    continue
+
+                await websocket.send_json(predict(**message["payload"]))
+
+            else:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "message": f"unknown event type {message['type']}",
+                    }
                 )
 
-    return run
+    return app
 
 
-async def server():
-    setup_logging(log_level=logging.INFO)
+setup_logging(log_level=logging.INFO)
 
-    loop = asyncio.get_running_loop()
-    stop = loop.create_future()
-    loop.add_signal_handler(signal.SIGTERM, stop.set_result, None)
-
-    run = build_run(os.environ["COG_PREDICTOR_REF"])
-
-    try:
-        async with serve(run, "localhost", int(os.environ.get("COG_CHILD_PORT", "8765"))):
-            await stop
-    except asyncio.exceptions.CancelledError:
-        pass
-
-
-if __name__ == "__main__":
-    asyncio.run(server())
+app = build_app(os.environ["COG_PREDICTOR_REF"])

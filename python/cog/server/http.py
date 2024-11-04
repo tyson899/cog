@@ -52,7 +52,7 @@ from .runner import (
     UnknownPredictionError,
 )
 from .telemetry import make_trace_context, trace_context
-from .worker import make_worker
+from .worker import make_worker, WorkerFlavor
 
 if TYPE_CHECKING:
     from typing import ParamSpec, TypeVar  # pylint: disable=import-outside-toplevel
@@ -119,6 +119,7 @@ def create_app(  # pylint: disable=too-many-arguments,too-many-locals,too-many-s
     mode: str = "predict",
     is_build: bool = False,
     await_explicit_shutdown: bool = False,  # pylint: disable=redefined-outer-name
+    worker_flavor: WorkerFlavor = WorkerFlavor.MULTIPROCESSING,
 ) -> MyFastAPI:
     app = MyFastAPI(  # pylint: disable=redefined-outer-name
         title="Cog",  # TODO: mention model name?
@@ -167,7 +168,7 @@ def create_app(  # pylint: disable=too-many-arguments,too-many-locals,too-many-s
         add_setup_failed_routes(app, started_at, msg)
         return app
 
-    worker = make_worker(predictor_ref=predictor_ref)
+    worker = make_worker(predictor_ref=predictor_ref, flavor=worker_flavor)
     runner = PredictionRunner(worker=worker)
 
     class PredictionRequest(schema.PredictionRequest.with_types(input_type=InputType)):
@@ -637,6 +638,9 @@ if __name__ == "__main__":
         upload_url=args.upload_url,
         mode=args.mode,
         await_explicit_shutdown=await_explicit_shutdown,
+        worker_flavor=WorkerFlavor.WEBSOCKET
+        if os.getenv("COG_WORKER_FLAVOR", "").lower() == "websocket"
+        else WorkerFlavor.MULTIPROCESSING,
     )
 
     host: str = args.host

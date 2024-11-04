@@ -26,10 +26,10 @@ dependencies = [
   "pydantic>=1.9,<3",
   "PyYAML",
   "requests>=2,<3",
+  "starlette>=0.10.0,<1",
   "structlog>=20,<25",
   "typing_extensions>=4.4.0",
-  "uvicorn[standard]>=0.12,<1", # mostly server only
-  "websockets",
+  "uvicorn[standard]>=0.12,<1",
 ]
 
 dynamic = ["version"]
