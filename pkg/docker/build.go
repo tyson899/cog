@@ -44,7 +44,16 @@ func Build(dir, dockerfile, imageName string, secrets []string, noCache bool, pr
 
 	}
 
-	if config.BuildXCachePath != "" {
+	fmt.Printf(">>>>>> os.Getenv('GITHUB_ACTIONS'): %v\n", os.Getenv("GITHUB_ACTIONS")) // TODO(andreas): remove debug
+
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		console.Infof("Running inside Github Actions")
+		args = append(
+			args,
+			"--cache-from", "type=gha",
+			"--cache-to", "type=gha",
+		)
+	} else if config.BuildXCachePath != "" {
 		args = append(
 			args,
 			"--cache-from", "type=local,src="+config.BuildXCachePath,
