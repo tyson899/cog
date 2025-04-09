@@ -129,6 +129,8 @@ func Build(cfg *config.Config, dir, imageName string, secrets []string, noCache,
 			if err != nil {
 				return fmt.Errorf("Failed to generate Dockerfile: %w", err)
 			}
+			fmt.Println(dockerfileContents)
+
 			if err := docker.Build(dir, dockerfileContents, imageName, secrets, noCache, progressOutput, config.BuildSourceEpochTimestamp, contextDir, buildContexts); err != nil {
 				return fmt.Errorf("Failed to build Docker image: %w", err)
 			}
@@ -291,6 +293,11 @@ func BuildBase(cfg *config.Config, dir string, useCudaBaseImage string, useCogBa
 	if err != nil {
 		return "", fmt.Errorf("Failed to generate Dockerfile: %w", err)
 	}
+	dockerfileLines := strings.Split(dockerfileContents, "\n")
+	dockerfileLines = append(dockerfileLines[:len(dockerfileLines)-1], "COPY predict.py cog.yaml /src/", dockerfileLines[len(dockerfileLines)-1])
+	dockerfileContents = strings.Join(dockerfileLines, "\n")
+
+	fmt.Println(dockerfileContents)
 	if err := docker.Build(dir, dockerfileContents, imageName, []string{}, false, progressOutput, config.BuildSourceEpochTimestamp, contextDir, buildContexts); err != nil {
 		return "", fmt.Errorf("Failed to build Docker image: %w", err)
 	}

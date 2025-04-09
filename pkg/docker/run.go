@@ -82,11 +82,11 @@ func generateDockerArgs(options internalRunOptions) []string {
 	if options.TTY {
 		dockerArgs = append(dockerArgs, "--tty")
 	}
-	for _, volume := range options.Volumes {
-		// This needs escaping if we want to support commas in filenames
-		// https://github.com/moby/moby/issues/8604
-		dockerArgs = append(dockerArgs, "--mount", "type=bind,source="+volume.Source+",destination="+volume.Destination)
-	}
+	// for _, volume := range options.Volumes {
+	// 	// This needs escaping if we want to support commas in filenames
+	// 	// https://github.com/moby/moby/issues/8604
+	// 	dockerArgs = append(dockerArgs, "--mount", "type=bind,source="+volume.Source+",destination="+volume.Destination)
+	// }
 	if options.Workdir != "" {
 		dockerArgs = append(dockerArgs, "--workdir", options.Workdir)
 	}
@@ -208,7 +208,6 @@ func GetPort(containerID string, containerPort int) (int, error) {
 	}
 
 	return 0, fmt.Errorf("did not find port bound to 0.0.0.0 in `docker port` output")
-
 }
 
 func FillInWeightsManifestVolumes(dockerCommand command.Command, runOptions RunOptions) (RunOptions, error) {

@@ -90,10 +90,10 @@ func cmdPredict(cmd *cobra.Command, args []string) error {
 			}
 
 			// Base image doesn't have /src in it, so mount as volume
-			volumes = append(volumes, docker.Volume{
-				Source:      projectDir,
-				Destination: "/src",
-			})
+			// volumes = append(volumes, docker.Volume{
+			// 	Source:      projectDir,
+			// 	Destination: "/src",
+			// })
 
 			if gpus == "" && cfg.Build.GPU {
 				gpus = "all"
@@ -189,6 +189,8 @@ func cmdPredict(cmd *cobra.Command, args []string) error {
 			console.Warnf("Failed to stop container: %s", err)
 		}
 	}()
+
+	// cmd, err := exec.Command("docker ")
 
 	return predictIndividualInputs(*predictor, inputFlags, outPath, false)
 }
